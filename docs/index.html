@@ -295,6 +295,33 @@
   .drink-note { font-size: 12.5px; color: var(--ink3); }
   .drink-note.prompt { color: var(--party); }
 
+  /* Three of the six rules put a drink on the table. That has to read from
+     across it, and it has to be obvious which rules those are. */
+  .drink-call {
+    display: inline-block;
+    background: var(--party);
+    color: #050907;
+    font-size: 15px;
+    font-weight: 900;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 8px 18px;
+    border-radius: 999px;
+  }
+
+  .drink-chip {
+    font-size: 9.5px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--party);
+    border: 1px solid color-mix(in srgb, var(--party) 50%, transparent);
+    border-radius: 999px;
+    padding: 2px 7px;
+    white-space: nowrap;
+    flex: none;
+  }
+
   .log-btn {
     width: 100%;
     border: none;
@@ -700,6 +727,7 @@
                 <div class="row-title">${r.name}</div>
                 <div class="row-sub">${r.detail}</div>
               </div>
+              ${r.drink ? `<span class="drink-chip">Drink</span>` : ""}
             </div>`).join("")}
         </div>
       </div>`;
@@ -783,6 +811,7 @@
             <div class="pip-frame">${dieHTML(lastRoll.pips - 1, "")}</div>
             <h2 class="rule-name">${rule.name.toUpperCase()}</h2>
             <p class="rule-detail">${rule.detail}</p>
+            ${rule.drink ? `<span class="drink-call">Drink</span>` : ""}
           </div>` : `
           <div class="stack center" style="gap:14px">
             <div style="opacity:.7">${dieHTML(state.currentFace, "big")}</div>
