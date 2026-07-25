@@ -1,680 +1,1107 @@
-<title>The Cube — Live</title>
+<title>Work Hard Play Hard Cube</title>
 
 <style>
+  /* Palettes ported from Theme.swift. The app commits to a time of day per
+     tab rather than following the OS — night for Tonight, paper for Today —
+     so this page does the same instead of offering a light/dark toggle. */
   :root {
-    color-scheme: light dark;
+    --page: #050907;
+    --paper: #0a1210;
+    --surface: #141f1b;
+    --recede: #1e2b26;
+    --ink: #f3f1e7;
+    --ink2: #a8b0a6;
+    --ink3: #75817a;
+    --accent: #3987e5;
+    --border: rgba(243, 241, 231, 0.1);
+    --on-accent: #050907;
+    --card-shadow: transparent;
+    --glow: #3987e5;
+    --glow-op: 0.2;
 
-    /* Neutrals carry a slate-blue bias so they sit with the face accents
-       rather than fighting them. */
-    --ground: #eef1f6;
-    --panel: #ffffff;
-    --panel-edge: #d4dae6;
-    --ink: #10151f;
-    --ink-soft: #4d5a70;
-    --ink-faint: #8592a8;
-    --rail: #dde3ed;
+    --party: #3987e5;
+    --red: #d95926;
+    --yellow: #c98500;
+    --green: #199e70;
 
-    /* Overwritten at runtime by the live face. */
-    --face: #3987e5;
-    --face-soft: #3987e51a;
-
-    --ok: #199e70;
-    --warn: #c98500;
-
-    --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, monospace;
     --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
   }
 
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --ground: #0b0f16;
-      --panel: #141a24;
-      --panel-edge: #232c3a;
-      --ink: #eef2f8;
-      --ink-soft: #9aa8be;
-      --ink-faint: #66748c;
-      --rail: #202836;
-    }
-  }
-
-  :root[data-theme="dark"] {
-    --ground: #0b0f16;
-    --panel: #141a24;
-    --panel-edge: #232c3a;
-    --ink: #eef2f8;
-    --ink-soft: #9aa8be;
-    --ink-faint: #66748c;
-    --rail: #202836;
-  }
-
-  :root[data-theme="light"] {
-    --ground: #eef1f6;
-    --panel: #ffffff;
-    --panel-edge: #d4dae6;
-    --ink: #10151f;
-    --ink-soft: #4d5a70;
-    --ink-faint: #8592a8;
-    --rail: #dde3ed;
+  body[data-tab="today"] {
+    --page: #ebe7d8;
+    --paper: #f6f3e9;
+    --surface: #fffdf6;
+    --recede: #e4e0d0;
+    --ink: #16211b;
+    --ink2: #53615a;
+    --ink3: #8b968e;
+    --accent: #199e70;
+    --border: rgba(22, 33, 27, 0.1);
+    --on-accent: #fcfffd;
+    --card-shadow: rgba(22, 33, 27, 0.07);
+    --glow: #f2c75b;
+    --glow-op: 0.22;
   }
 
   * { box-sizing: border-box; }
 
   body {
     margin: 0;
-    background: var(--ground);
+    background: var(--paper);
     color: var(--ink);
     font-family: var(--sans);
-    line-height: 1.5;
+    line-height: 1.45;
     -webkit-font-smoothing: antialiased;
+    transition: background 0.35s ease, color 0.35s ease;
   }
 
-  .wrap {
-    max-width: 1080px;
-    margin: 0 auto;
-    padding: clamp(16px, 3vw, 32px);
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-  }
-
-  /* ---------------- header ---------------- */
-
-  header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 12px;
-    padding-bottom: 16px;
-    border-bottom: 1px solid var(--rail);
-  }
-
-  .title {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .title h1 {
-    margin: 0;
-    font-size: clamp(20px, 3vw, 26px);
-    font-weight: 700;
-    letter-spacing: -0.02em;
-  }
-
-  .title span {
-    font-family: var(--mono);
-    font-size: 11px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--ink-faint);
-  }
-
-  .head-actions {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-
-  .status {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 12px;
-    border-radius: 999px;
-    border: 1px solid var(--panel-edge);
-    background: var(--panel);
-    font-family: var(--mono);
-    font-size: 12px;
-    letter-spacing: 0.04em;
-    color: var(--ink-soft);
-  }
-
-  .dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--ink-faint);
-    flex: none;
-  }
-
-  .status[data-state="live"] .dot { background: var(--ok); }
-  .status[data-state="live"] { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, var(--panel-edge)); }
-  .status[data-state="sim"] .dot { background: var(--warn); }
-  .status[data-state="sim"] { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, var(--panel-edge)); }
-
-  @media (prefers-reduced-motion: no-preference) {
-    .status[data-state="live"] .dot { animation: breathe 2s ease-in-out infinite; }
-  }
-
-  @keyframes breathe { 50% { opacity: 0.35; } }
-
-  button {
-    font: inherit;
-    cursor: pointer;
-    border-radius: 8px;
-    border: 1px solid var(--panel-edge);
-    background: var(--panel);
-    color: var(--ink);
-    padding: 8px 14px;
-    transition: border-color 0.15s, background 0.15s;
-  }
-
-  button:hover { border-color: var(--face); }
-  button:focus-visible { outline: 2px solid var(--face); outline-offset: 2px; }
-
-  .connect {
-    background: var(--face);
-    border-color: var(--face);
-    color: #fff;
-    font-weight: 600;
-  }
-
-  .connect:hover { filter: brightness(1.08); border-color: var(--face); }
-
-  /* ---------------- main grid ---------------- */
-
-  .grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 20px;
-  }
-
-  @media (max-width: 760px) {
-    .grid { grid-template-columns: minmax(0, 1fr); }
-  }
-
-  .panel {
-    background: var(--panel);
-    border: 1px solid var(--panel-edge);
-    border-radius: 14px;
-    padding: 20px;
-  }
-
-  .panel h2 {
-    margin: 0 0 14px;
-    font-family: var(--mono);
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--ink-faint);
-  }
-
-  /* ---------------- the die ---------------- */
-
-  .face-panel {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 18px;
-    /* The live face tints its own panel — the one place hardware state
-       colours the chrome. */
-    background: linear-gradient(180deg, var(--face-soft), transparent 60%), var(--panel);
-    border-color: color-mix(in srgb, var(--face) 30%, var(--panel-edge));
-  }
-
-  .die {
-    width: min(260px, 62vw);
-    aspect-ratio: 1;
-    border-radius: 22px;
-    background: var(--face);
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    grid-template-rows: repeat(3, 1fr);
-    padding: 14%;
-    gap: 8%;
-    box-shadow: 0 18px 40px -18px var(--face);
+  /* The single decoration either half gets. */
+  .glow {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(circle at 50% 8%, color-mix(in srgb, var(--glow) calc(var(--glow-op) * 100%), transparent), transparent 70%);
     transition: background 0.35s ease;
   }
 
-  .die.rolling { animation: tumble 0.5s ease; }
-
-  @keyframes tumble {
-    30% { transform: rotate(-9deg) scale(0.95); }
-    65% { transform: rotate(7deg) scale(1.03); }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .die.rolling { animation: none; }
-  }
-
-  .pip {
-    border-radius: 50%;
-    background: #fff;
-    box-shadow: inset 0 -2px 4px rgba(0, 0, 0, 0.18);
-  }
-
-  .pip.hidden { visibility: hidden; }
-
-  .face-name {
-    font-size: clamp(26px, 4.5vw, 36px);
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    text-align: center;
-    text-wrap: balance;
-    margin: 0;
-  }
-
-  .face-meta {
-    font-family: var(--mono);
-    font-size: 12px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--ink-faint);
-    margin: -12px 0 0;
-  }
-
-  /* ---------------- stats ---------------- */
-
-  .stats {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px;
-    margin-bottom: 18px;
-  }
-
-  .stat {
-    border: 1px solid var(--panel-edge);
-    border-radius: 10px;
-    padding: 10px 12px;
+  .phone {
+    position: relative;
+    max-width: 460px;
+    margin: 0 auto;
+    min-height: 100vh;
     display: flex;
     flex-direction: column;
-    gap: 2px;
   }
 
-  .stat b {
-    font-family: var(--mono);
-    font-size: 24px;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    line-height: 1.1;
-  }
-
-  .stat span {
-    font-family: var(--mono);
-    font-size: 10px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--ink-faint);
-  }
-
-  /* ---------------- event feed ---------------- */
-
-  .feed {
-    list-style: none;
-    margin: 0;
-    padding: 0;
+  .screen {
+    flex: 1;
+    padding: 16px 20px 24px;
     display: flex;
     flex-direction: column;
-    gap: 1px;
-    max-height: 300px;
+    gap: 20px;
     overflow-y: auto;
   }
 
-  .feed li {
-    display: grid;
-    grid-template-columns: 62px 1fr auto;
-    gap: 10px;
-    align-items: baseline;
-    padding: 8px 2px;
-    border-bottom: 1px solid var(--rail);
-    font-size: 14px;
-  }
+  .hidden { display: none !important; }
 
-  .feed li:last-child { border-bottom: 0; }
+  /* ---------- type ---------- */
 
-  .feed time {
-    font-family: var(--mono);
+  .eyebrow {
     font-size: 11px;
-    font-variant-numeric: tabular-nums;
-    color: var(--ink-faint);
-  }
-
-  .feed .kind {
-    font-family: var(--mono);
-    font-size: 10px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    padding: 2px 7px;
-    border-radius: 999px;
-    border: 1px solid var(--panel-edge);
-    color: var(--ink-soft);
-    white-space: nowrap;
-  }
-
-  .feed .kind[data-k="tap"] { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 45%, transparent); }
-  .feed .kind[data-k="roll"] { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
-
-  /* The empty state is prose, not a row — it must escape the feed's grid.
-     The [hidden] rule has to win over that display, or it never goes away. */
-  .feed li.empty {
-    display: block;
-    border-bottom: 0;
-    color: var(--ink-faint);
-    font-size: 14px;
-    padding: 8px 2px;
-  }
-
-  .feed li.empty[hidden] { display: none; }
-
-  /* ---------------- manual controls ---------------- */
-
-  .sim {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .sim button {
-    font-family: var(--mono);
-    font-size: 12px;
-    padding: 7px 11px;
-  }
-
-  .hint {
-    margin: 12px 0 0;
-    font-size: 13px;
-    color: var(--ink-faint);
-  }
-
-  kbd {
-    font-family: var(--mono);
-    font-size: 11px;
-    border: 1px solid var(--panel-edge);
-    border-bottom-width: 2px;
-    border-radius: 4px;
-    padding: 1px 5px;
-    color: var(--ink-soft);
-  }
-
-  .note {
-    font-size: 13px;
-    color: var(--ink-soft);
-    border-left: 2px solid var(--face);
-    padding-left: 12px;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    color: var(--ink3);
     margin: 0;
   }
 
-  footer {
-    border-top: 1px solid var(--rail);
-    padding-top: 14px;
-    font-size: 12px;
-    color: var(--ink-faint);
-    font-family: var(--mono);
-    letter-spacing: 0.04em;
+  .screen-head .eyebrow { color: var(--accent); }
+  .screen-head h1 {
+    margin: 2px 0 0;
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
   }
+
+  h2.eyebrow { text-transform: uppercase; }
+
+  /* ---------- cards ---------- */
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    box-shadow: 0 10px 24px -12px var(--card-shadow);
+    padding: 20px;
+  }
+
+  .card.tight { border-radius: 20px; padding: 16px; }
+
+  .stack { display: flex; flex-direction: column; gap: 10px; }
+  .center { align-items: center; text-align: center; }
+
+  /* ---------- die ---------- */
+
+  /* Every internal measurement is derived from --s. Percentage padding would
+     resolve against the parent's width instead of the die's own, which
+     collapses the pip grid to nothing. */
+  .die {
+    --s: 50px;
+    width: var(--s);
+    height: var(--s);
+    border-radius: calc(var(--s) * 0.28);
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    padding: calc(var(--s) * 0.15);
+    gap: calc(var(--s) * 0.05);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    flex: none;
+  }
+
+  .die i { border-radius: 50%; background: rgba(255, 255, 255, 0.95); }
+  .die i.off { visibility: hidden; }
+
+  .die.big { --s: 96px; }
+  .die.mid { --s: 50px; }
+  .die.sm { --s: 32px; }
+  .die.xs { --s: 36px; cursor: pointer; }
+
+  /* ---------- buttons ---------- */
+
+  button { font: inherit; cursor: pointer; }
+
+  .big-btn {
+    width: 100%;
+    border: none;
+    border-radius: 18px;
+    padding: 17px;
+    font-size: 17px;
+    font-weight: 800;
+    background: var(--btn, var(--accent));
+    color: var(--on-accent);
+  }
+
+  .big-btn.ghost {
+    background: transparent;
+    color: var(--ink2);
+    border: 1.5px solid color-mix(in srgb, var(--ink2) 50%, transparent);
+  }
+
+  .big-btn:focus-visible, .face-btn:focus-visible, .link:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .link {
+    background: none;
+    border: none;
+    color: var(--party);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 0;
+  }
+
+  .face-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    border-radius: 10px;
+    line-height: 0;
+  }
+
+  .face-btn[aria-pressed="true"] { outline: 2px solid var(--ink); outline-offset: 1px; }
+
+  /* ---------- stat tiles ---------- */
+
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .tiles.two { grid-template-columns: repeat(2, 1fr); }
+
+  .tile {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 12px 14px;
+  }
+
+  .tile b {
+    display: block;
+    font-family: var(--mono);
+    font-size: 21px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tile span { font-size: 11px; color: var(--ink2); }
+
+  /* ---------- roll result ---------- */
+
+  .roll-card {
+    flex: 1;
+    min-height: 260px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .rule-name {
+    font-size: clamp(34px, 12vw, 54px);
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .rule-detail { font-size: 17px; font-weight: 600; color: var(--ink2); margin: 0; }
+
+  .roll-flash {
+    position: absolute;
+    inset: 0;
+    background: var(--face-color, transparent);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .roll-card.landed .roll-flash { animation: flash 0.9s ease-out; }
+    .roll-card.landed .roll-body { animation: pop 0.42s cubic-bezier(0.2, 1.5, 0.4, 1); }
+  }
+
+  @keyframes flash { from { opacity: 0.22; } to { opacity: 0; } }
+  @keyframes pop { from { transform: scale(0.86); } to { transform: scale(1); } }
+
+  .pip-frame {
+    width: 76px;
+    height: 76px;
+    border-radius: 20px;
+    border: 2px solid color-mix(in srgb, var(--face-color) 55%, transparent);
+    display: grid;
+    place-items: center;
+  }
+
+  .pip-frame .die {
+    --s: 50px;
+    background: transparent !important;
+    border: none;
+    padding: 0;
+    gap: calc(var(--s) * 0.1);
+  }
+
+  .pip-frame .die i { background: var(--face-color); }
+
+  /* ---------- drink counter ---------- */
+
+  .drink-head { display: flex; align-items: baseline; gap: 10px; }
+
+  .drink-count {
+    font-size: 44px;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .drink-count.bump { animation: bump 0.34s ease; }
+  }
+
+  @keyframes bump { 40% { transform: scale(1.18); } }
+
+  .drink-note { font-size: 12.5px; color: var(--ink3); }
+  .drink-note.prompt { color: var(--party); }
+
+  .log-btn {
+    width: 100%;
+    border: none;
+    border-radius: 16px;
+    padding: 15px;
+    font-size: 17px;
+    font-weight: 800;
+    background: var(--party);
+    color: #050907;
+  }
+
+  /* ---------- debt hero ---------- */
+
+  .debt-number {
+    font-size: 60px;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+
+  .bar {
+    height: 8px;
+    width: 100%;
+    border-radius: 99px;
+    background: var(--recede);
+    overflow: hidden;
+  }
+
+  .bar i {
+    display: block;
+    height: 100%;
+    border-radius: 99px;
+    transition: width 0.6s ease, background 0.5s ease;
+  }
+
+  /* ---------- rows ---------- */
+
+  .row { display: flex; align-items: center; gap: 12px; }
+  .row .grow { flex: 1; min-width: 0; }
+
+  .row-title { font-size: 14px; font-weight: 700; }
+  .row-sub { font-size: 12px; color: var(--ink2); }
+
+  .rate {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink2);
+  }
+
+  .rate.live { color: var(--accent); }
+
+  .earning {
+    font-family: var(--mono);
+    font-size: 19px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- pill ---------- */
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border-radius: 99px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--ink3);
+    align-self: flex-start;
+  }
+
+  .pill i { width: 6px; height: 6px; border-radius: 50%; background: var(--ink3); }
+  .pill.on i { background: var(--accent); }
+  .pill.on { color: var(--accent); }
+
+  /* ---------- tab bar ---------- */
+
+  .tabs {
+    display: flex;
+    border-top: 1px solid var(--border);
+    background: var(--paper);
+    position: sticky;
+    bottom: 0;
+  }
+
+  .tabs button {
+    flex: 1;
+    background: none;
+    border: none;
+    padding: 12px 0 8px;
+    color: var(--ink3);
+    font-size: 11.5px;
+    font-weight: 700;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    position: relative;
+  }
+
+  .tabs button[aria-selected="true"] { color: var(--tab-tint); }
+  .tabs button .glyph { font-size: 17px; line-height: 1; }
+
+  .tabs .live-dot {
+    position: absolute;
+    top: 9px;
+    margin-left: 22px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+
+  /* ---------- sheet ---------- */
+
+  .sheet-scrim {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 10;
+  }
+
+  .sheet {
+    background: var(--paper);
+    width: 100%;
+    max-width: 460px;
+    border-radius: 22px 22px 0 0;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    max-height: 88vh;
+    overflow-y: auto;
+  }
+
+  .headcount {
+    font-size: 76px;
+    font-weight: 900;
+    text-align: center;
+    color: var(--party);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+
+  input[type="range"] { width: 100%; accent-color: var(--party); }
+
+  .mascot { display: block; margin: 0 auto; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .mascot { animation: bob 3.2s ease-in-out infinite alternate; }
+  }
+
+  @keyframes bob { to { transform: translateY(-5px); } }
+
+  .muted { color: var(--ink2); font-size: 13.5px; margin: 0; }
+  .tiny { color: var(--ink3); font-size: 11.5px; margin: 0; }
+  .strong { font-size: 20px; font-weight: 800; margin: 0; }
 </style>
 
-<div class="wrap">
-  <header>
-    <div class="title">
-      <h1>The Cube</h1>
-      <span>Live telemetry</span>
-    </div>
-    <div class="head-actions">
-      <div class="status" id="status" data-state="idle">
-        <i class="dot"></i><span id="status-text">Not connected</span>
-      </div>
-      <button class="connect" id="connect">Connect cube</button>
-    </div>
-  </header>
+<div class="glow"></div>
 
-  <div class="grid">
-    <section class="panel face-panel">
-      <div class="die" id="die" aria-live="polite" aria-label="Cube face">
-        <i class="pip"></i><i class="pip"></i><i class="pip"></i>
-        <i class="pip"></i><i class="pip"></i><i class="pip"></i>
-        <i class="pip"></i><i class="pip"></i><i class="pip"></i>
-      </div>
-      <h2 class="face-name" id="face-name">Waiting for the cube</h2>
-      <p class="face-meta" id="face-meta">No face reported</p>
-    </section>
+<div class="phone">
+  <main class="screen" id="screen"></main>
 
-    <section class="panel">
-      <h2>This session</h2>
-      <div class="stats">
-        <div class="stat"><b id="s-flips">0</b><span>Flips</span></div>
-        <div class="stat"><b id="s-rolls">0</b><span>Rolls</span></div>
-        <div class="stat"><b id="s-taps">0</b><span>Double taps</span></div>
-      </div>
-
-      <h2>Event feed</h2>
-      <ul class="feed" id="feed">
-        <li class="empty" id="feed-empty">Nothing yet. Connect the cube, or drive it by hand below.</li>
-      </ul>
-    </section>
-  </div>
-
-  <section class="panel">
-    <h2>Drive by hand</h2>
-    <div class="sim" id="sim"></div>
-    <p class="hint">
-      Keyboard: <kbd>1</kbd>–<kbd>6</kbd> set a face · <kbd>D</kbd> double tap · <kbd>R</kbd> roll
-    </p>
-  </section>
-
-  <p class="note" id="note">
-    Live connection needs Web Bluetooth — Chrome or Edge on desktop or Android.
-    iOS Safari has no Web Bluetooth at all, so on an iPhone the manual controls
-    are the way to drive this.
-  </p>
-
-  <footer>
-    Service 4FAFC201 · face + event characteristics · face index 0–5
-  </footer>
+  <nav class="tabs">
+    <button id="tab-tonight" aria-selected="true" style="--tab-tint: #3987e5">
+      <span class="glyph">⚄</span>Tonight<i class="live-dot" id="dot-tonight"></i>
+    </button>
+    <button id="tab-today" aria-selected="false" style="--tab-tint: #199e70">
+      <span class="glyph">◳</span>Today<i class="live-dot" id="dot-today"></i>
+    </button>
+  </nav>
 </div>
+
+<div id="sheet-host"></div>
 
 <script>
   "use strict";
 
-  // Matches the firmware and CubeBLEManager.swift.
+  /* ========== domain, ported from Models.swift / AppStore.swift ========== */
+
+  const T = {
+    debtPerAvgDrink: 15, debtCap: 100, redThreshold: 50,
+    hydratePoints: 8, hydrateCooldown: 30 * 60,
+    movePerMin: 1.0, deepWorkPerMin: 0.5, createPerMin: 0.5,
+    socialPerMin: 0.25, restPerMin: 0.25, decayPerHour: 2,
+    defaultHeadcount: 4,
+  };
+
+  const MODES = [
+    { key: "deepWork", name: "Deep Work", color: "#3987E5", rate: T.deepWorkPerMin },
+    { key: "move", name: "Move", color: "#D95926", rate: T.movePerMin },
+    { key: "create", name: "Create", color: "#D55181", rate: T.createPerMin },
+    { key: "social", name: "Social", color: "#C98500", rate: T.socialPerMin },
+    { key: "rest", name: "Rest", color: "#199E70", rate: T.restPerMin },
+    { key: "hydrate", name: "Hydrate", color: "#2FA8C9", rate: 0 },
+  ];
+
+  const HYDRATE = 5; // face index
+
+  const RULES = [
+    { pips: 1, name: "Waterfall", detail: "Everyone drinks until the roller stops.", drink: true },
+    { pips: 2, name: "You", detail: "Pick someone. They drink.", drink: false },
+    { pips: 3, name: "Me", detail: "That's you. Drink.", drink: true },
+    { pips: 4, name: "Categories", detail: "Name a category. First to stall drinks.", drink: false },
+    { pips: 5, name: "Rule Maker", detail: "Invent a rule. It holds all night.", drink: false },
+    { pips: 6, name: "Social", detail: "Everyone drinks. Together.", drink: true },
+  ];
+
+  // Cells 1-9, row-major — the layouts from Components.swift.
+  const PIPS = { 1: [5], 2: [1, 9], 3: [1, 5, 9], 4: [1, 3, 7, 9], 5: [1, 3, 5, 7, 9], 6: [1, 3, 4, 6, 7, 9] };
+
+  const state = {
+    phase: "idle",              // idle | party | recovery
+    tab: "tonight",
+    currentFace: null,          // face index
+    session: null,              // { startedAt, headcount, drinks: [], rolls: [] }
+    day: null,                  // { startingDebt, entries: [], active, clearedAt }
+    lastSummary: null,
+    connected: false,
+    lastHydrateAt: null,
+  };
+
+  const now = () => Date.now();
+  const rateOf = (i) => MODES[i].rate;
+
+  function rateLabel(i) {
+    if (i === HYDRATE) return `+${T.hydratePoints} per glass`;
+    const r = rateOf(i);
+    return `+${r === Math.round(r) ? r.toFixed(1) : r} / min`;
+  }
+
+  function activePoints(day, at) {
+    if (!day || !day.active) return 0;
+    return Math.max(0, (at - day.active.startedAt) / 60000) * rateOf(day.active.face);
+  }
+
+  function earned(day, at) {
+    if (!day) return 0;
+    return day.entries.reduce((s, e) => s + e.points, 0) + activePoints(day, at);
+  }
+
+  function debtRemaining(at) {
+    if (!state.day) return 0;
+    return Math.max(0, state.day.startingDebt - earned(state.day, at));
+  }
+
+  function band(debt) {
+    if (debt <= 0) return "green";
+    return debt >= T.redThreshold ? "red" : "yellow";
+  }
+
+  const BAND_COLOR = { red: "#D95926", yellow: "#C98500", green: "#199E70" };
+  const BAND_LINE = {
+    red: "Cube's rough this morning.",
+    yellow: "Cube's coming around.",
+    green: "Cube's back. Nice.",
+  };
+
+  function compactDuration(ms) {
+    const total = Math.max(0, Math.floor(ms / 1000));
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    if (h > 0) return `${h}h ${m}m`;
+    if (m > 0) return `${m}m`;
+    return `${total}s`;
+  }
+
+  /* ========== actions ========== */
+
+  function startNight(headcount) {
+    state.session = { startedAt: now(), headcount, drinks: [], rolls: [] };
+    state.phase = "party";
+    state.tab = "tonight";
+    render();
+  }
+
+  function logDrink() {
+    if (state.phase !== "party") return;
+    state.session.drinks.push(now());
+    render({ bumpDrink: true });
+  }
+
+  function undoDrink() {
+    if (state.phase !== "party" || !state.session.drinks.length) return;
+    state.session.drinks.pop();
+    render({ bumpDrink: true });
+  }
+
+  function registerRoll(faceIndex) {
+    if (state.phase !== "party") return;
+    const face = faceIndex != null ? faceIndex : state.currentFace;
+    if (face == null) return;
+    state.currentFace = face;
+    state.session.rolls.push({ at: now(), pips: face + 1 });
+    render({ landed: true });
+  }
+
+  function endNight() {
+    const s = state.session;
+    s.endedAt = now();
+    state.lastSummary = s;
+
+    const perPlayer = s.headcount > 0 ? s.drinks.length / s.headcount : s.drinks.length;
+    const startingDebt = Math.min(T.debtCap, perPlayer * T.debtPerAvgDrink);
+
+    state.day = { startingDebt, entries: [], active: null, clearedAt: null };
+    if (state.currentFace != null && rateOf(state.currentFace) > 0) {
+      state.day.active = { face: state.currentFace, startedAt: now() };
+    }
+    state.phase = "recovery";
+    state.session = null;
+    showSummary(s, startingDebt);
+  }
+
+  // Every face change — BLE notification or a manual tap.
+  function setFace(index) {
+    if (index == null || index < 0 || index >= MODES.length) return;
+    if (index === state.currentFace) return;
+    state.currentFace = index;
+
+    if (state.phase === "recovery" && state.day) {
+      const day = state.day;
+      if (day.active) {
+        const pts = activePoints(day, now());
+        if (pts > 0.01) day.entries.push({ face: day.active.face, points: pts });
+        day.active = null;
+      }
+      if (index === HYDRATE) {
+        const ready = !state.lastHydrateAt || now() - state.lastHydrateAt >= T.hydrateCooldown * 1000;
+        if (ready) {
+          day.entries.push({ face: HYDRATE, points: T.hydratePoints });
+          state.lastHydrateAt = now();
+        }
+      } else {
+        day.active = { face: index, startedAt: now() };
+      }
+    }
+    render();
+  }
+
+  /* ========== rendering helpers ========== */
+
+  const h = (html) => html;
+
+  function dieHTML(faceIndex, cls) {
+    if (faceIndex == null) {
+      return `<div class="die ${cls}" style="background: var(--recede)">${"<i class='off'></i>".repeat(9)}</div>`;
+    }
+    const lit = PIPS[faceIndex + 1];
+    const cells = Array.from({ length: 9 }, (_, i) =>
+      `<i class="${lit.includes(i + 1) ? "" : "off"}"></i>`).join("");
+    return `<div class="die ${cls}" style="background:${MODES[faceIndex].color}">${cells}</div>`;
+  }
+
+  function mascotSVG(b, size) {
+    const ink = "rgba(11,18,14,0.85)";
+    let face;
+    if (b === "red") {
+      face = `
+        <path d="M42 50 L58 66 M58 50 L42 66" stroke="${ink}" stroke-width="4" stroke-linecap="round" fill="none"/>
+        <path d="M82 50 L98 66 M98 50 L82 66" stroke="${ink}" stroke-width="4" stroke-linecap="round" fill="none"/>
+        <path d="M47 92 Q53.75 85 60.5 92 T74 92 T87.5 92 T93 92" stroke="${ink}" stroke-width="4"
+              stroke-linecap="round" fill="none"/>`;
+    } else if (b === "yellow") {
+      face = `
+        <rect x="42.5" y="58" width="15" height="4" rx="2" fill="${ink}"/>
+        <rect x="82.5" y="58" width="15" height="4" rx="2" fill="${ink}"/>
+        <path d="M50 92 Q70 86 90 92" stroke="${ink}" stroke-width="4" stroke-linecap="round" fill="none"/>`;
+    } else {
+      face = `
+        <path d="M40 60 Q50 42 60 60" stroke="${ink}" stroke-width="4" stroke-linecap="round" fill="none"/>
+        <path d="M80 60 Q90 42 100 60" stroke="${ink}" stroke-width="4" stroke-linecap="round" fill="none"/>
+        <path d="M46 88 Q70 116 94 88" stroke="${ink}" stroke-width="4.5" stroke-linecap="round" fill="none"/>`;
+    }
+    return `<svg class="mascot" width="${size}" height="${size}" viewBox="0 0 140 140" aria-hidden="true">
+      <rect x="0" y="0" width="140" height="140" rx="36" fill="${BAND_COLOR[b]}"/>
+      ${face}
+    </svg>`;
+  }
+
+  function tilesHTML(items) {
+    return items.map((t) =>
+      `<div class="tile"><b${t.color ? ` style="color:${t.color}"` : ""}>${t.value}</b><span>${t.label}</span></div>`
+    ).join("");
+  }
+
+  function ruleDeckHTML() {
+    return `
+      <div class="stack">
+        <h2 class="eyebrow">The deck · Cube's Cup</h2>
+        <div class="card tight stack" style="gap:12px">
+          ${RULES.map((r) => `
+            <div class="row">
+              ${dieHTML(r.pips - 1, "sm")}
+              <div class="grow">
+                <div class="row-title">${r.name}</div>
+                <div class="row-sub">${r.detail}</div>
+              </div>
+            </div>`).join("")}
+        </div>
+      </div>`;
+  }
+
+  function connectPillHTML() {
+    return `<div class="pill ${state.connected ? "on" : ""}" id="connect-pill" role="button" tabindex="0">
+      <i></i>${state.connected ? "Cube connected" : "Connect the cube"}
+    </div>`;
+  }
+
+  function manualFacesHTML() {
+    return `
+      <div class="stack" style="gap:6px">
+        <div class="row" style="gap:8px;flex-wrap:wrap">
+          ${MODES.map((m, i) => `
+            <button class="face-btn" data-face="${i}" aria-pressed="${state.currentFace === i}"
+                    aria-label="${m.name}">${dieHTML(i, "xs")}</button>`).join("")}
+        </div>
+        <p class="tiny">Log a face by hand</p>
+      </div>`;
+  }
+
+  /* ========== screens ========== */
+
+  function tonightIdle() {
+    const last = state.lastSummary;
+    return `
+      <div class="screen-head"><p class="eyebrow">TONIGHT</p><h1>Play hard.</h1></div>
+
+      <div class="card stack center" style="gap:16px">
+        ${dieHTML(3, "big")}
+        <p class="strong">The cube is the die.</p>
+        <p class="muted">Roll it and it calls the shot. Double-tap it whenever someone
+          finishes a drink — the cube keeps count so nobody has to.</p>
+      </div>
+
+      <button class="big-btn" id="start-night" style="--btn: var(--party)">Start the night</button>
+
+      ${ruleDeckHTML()}
+
+      ${last ? `
+        <div class="stack">
+          <h2 class="eyebrow">Last night</h2>
+          <div class="tiles">${tilesHTML([
+            { value: last.drinks.length, label: "table drinks" },
+            { value: last.rolls.length, label: "rolls" },
+            { value: compactDuration((last.endedAt || now()) - last.startedAt), label: "on the table" },
+          ])}</div>
+        </div>` : ""}
+
+      <div style="display:flex;justify-content:center">${connectPillHTML()}</div>`;
+  }
+
+  function tonightLive() {
+    const s = state.session;
+    const lastRoll = s.rolls[s.rolls.length - 1];
+    const rule = lastRoll ? RULES[lastRoll.pips - 1] : null;
+    const faceColor = lastRoll ? MODES[lastRoll.pips - 1].color : "transparent";
+    const perPlayer = s.headcount > 0 ? s.drinks.length / s.headcount : s.drinks.length;
+
+    return `
+      <div class="row" style="align-items:flex-start">
+        <div class="screen-head grow">
+          <p class="eyebrow">PARTY MODE · CUBE'S CUP</p><h1>Roll it.</h1>
+        </div>
+        <div class="stack" style="align-items:flex-end;gap:4px">
+          <span class="rate" id="session-clock">${compactDuration(now() - s.startedAt)}</span>
+          <button class="link" id="show-rules">Rules</button>
+        </div>
+      </div>
+
+      <div class="card roll-card" id="roll-card" style="--face-color:${faceColor}">
+        <div class="roll-flash"></div>
+        ${rule ? `
+          <div class="roll-body stack center" style="gap:16px">
+            <div class="pip-frame">${dieHTML(lastRoll.pips - 1, "")}</div>
+            <h2 class="rule-name">${rule.name.toUpperCase()}</h2>
+            <p class="rule-detail">${rule.detail}</p>
+          </div>` : `
+          <div class="stack center" style="gap:14px">
+            <div style="opacity:.7">${dieHTML(state.currentFace, "big")}</div>
+            <p class="strong" style="color:var(--ink2)">Roll the cube</p>
+            <p class="tiny">Whatever face lands, the table plays it.</p>
+          </div>`}
+      </div>
+
+      <div class="card tight stack" style="gap:12px">
+        <div class="drink-head">
+          <span class="drink-count" id="drink-count">${s.drinks.length}</span>
+          <span style="font-size:15px;font-weight:700;color:var(--ink2)">${s.drinks.length === 1 ? "drink" : "drinks"}</span>
+          <span class="grow"></span>
+          <button class="link" id="undo-drink" style="color:var(--ink3)">undo</button>
+        </div>
+        <p class="drink-note ${rule && rule.drink ? "prompt" : ""}">
+          ${rule && rule.drink ? "Double-tap the cube when you drink." : "The cube's counting for the whole table."}
+        </p>
+        <button class="log-btn" id="log-drink">Log a drink</button>
+        <p class="tiny" style="text-align:center">or double-tap the cube</p>
+      </div>
+
+      <div class="tiles">${tilesHTML([
+        { value: s.rolls.length, label: "rolls" },
+        { value: s.headcount, label: "players" },
+        { value: perPlayer.toFixed(1), label: "avg / player" },
+      ])}</div>
+
+      <button class="big-btn ghost" id="end-night">End the night</button>
+
+      <div style="display:flex;justify-content:center">${connectPillHTML()}</div>`;
+  }
+
+  function todayScreen() {
+    const at = now();
+    const debt = debtRemaining(at);
+    const hasDebt = state.day != null && debt > 0;
+    const b = band(debt);
+
+    if (!hasDebt) {
+      return `
+        <div class="screen-head"><p class="eyebrow">TODAY</p><h1>Work hard.</h1></div>
+        ${connectPillHTML()}
+        <div class="card stack center" style="gap:14px">
+          ${mascotSVG("green", 140)}
+          <p class="strong">${state.day == null ? "Nothing to recover from." : "Cube's back. Nice."}</p>
+          <p class="muted">${state.day == null ? "Green all day." : "Cleared for the day. Whatever you do next is just for you."}</p>
+        </div>
+        ${faceRulesHTML("What each face means")}`;
+    }
+
+    const day = state.day;
+    const fill = Math.min(1, Math.max(0, debt / day.startingDebt));
+    const face = state.currentFace;
+    const active = day.active;
+
+    return `
+      <div class="screen-head"><p class="eyebrow">THE MORNING AFTER</p><h1>Work hard.</h1></div>
+      ${connectPillHTML()}
+
+      <div class="card stack center" style="gap:14px">
+        ${mascotSVG(b, 128)}
+        <p class="strong" style="font-size:17px">${BAND_LINE[b]}</p>
+        <div style="display:flex;align-items:baseline;gap:8px">
+          <span class="debt-number" style="color:${BAND_COLOR[b]}" id="debt-number">${Math.round(debt)}</span>
+          <span style="font-size:15px;font-weight:700;color:var(--ink2)">to go</span>
+        </div>
+        <div class="bar"><i id="debt-bar" style="width:${fill * 100}%;background:${BAND_COLOR[b]}"></i></div>
+        <p class="tiny" id="paid-line">${Math.round(earned(day, at))} paid down today</p>
+        <p class="tiny">Flip the cube to pay it down.</p>
+      </div>
+
+      <div class="stack">
+        <h2 class="eyebrow">Right now</h2>
+        <div class="card tight stack" style="gap:12px">
+          <div class="row">
+            ${dieHTML(face, "mid")}
+            <div class="grow">
+              <div class="row-title" style="font-size:17px">${face == null ? (state.connected ? "Waiting for a flip" : "Cube not connected") : MODES[face].name}</div>
+              <div class="row-sub">${
+                face == null
+                  ? (state.connected ? "Whichever face lands starts earning." : "Tap the face you're on to log it by hand.")
+                  : (face === HYDRATE ? `Logged — +${T.hydratePoints} a glass` : `Earning ${rateLabel(face)}`)
+              }</div>
+            </div>
+            ${active ? `<div style="text-align:right">
+              <div class="earning" style="color:${MODES[active.face].color}" id="earning">+${activePoints(day, at).toFixed(1)}</div>
+              <div class="tiny" id="earning-time">${compactDuration(at - active.startedAt)}</div>
+            </div>` : ""}
+          </div>
+          ${manualFacesHTML()}
+        </div>
+      </div>
+
+      ${faceRulesHTML("How to pay it down")}`;
+  }
+
+  function faceRulesHTML(eyebrow) {
+    const tier = (title, idxs) => `
+      <div class="stack" style="gap:10px">
+        <p class="eyebrow" style="opacity:.8">${title}</p>
+        ${idxs.map((i) => `
+          <div class="row">
+            ${dieHTML(i, "sm")}
+            <div class="grow"><div class="row-title">${MODES[i].name}</div></div>
+            <span class="rate ${state.currentFace === i ? "live" : ""}">${rateLabel(i)}</span>
+          </div>`).join("")}
+      </div>`;
+    return `
+      <div class="stack">
+        <h2 class="eyebrow">${eyebrow}</h2>
+        <div class="card tight stack" style="gap:16px">
+          ${tier("ACTIVE", [1, 0, 2])}
+          ${tier("RESTORE", [3, 4, 5])}
+        </div>
+      </div>`;
+  }
+
+  /* ========== render ========== */
+
+  function render(opts = {}) {
+    const body = document.body;
+    body.dataset.tab = state.tab;
+
+    document.getElementById("tab-tonight").setAttribute("aria-selected", state.tab === "tonight");
+    document.getElementById("tab-today").setAttribute("aria-selected", state.tab === "today");
+
+    const dotT = document.getElementById("dot-tonight");
+    dotT.style.background = state.phase === "party" ? "var(--party)" : "transparent";
+    const dotD = document.getElementById("dot-today");
+    const showDayDot = state.phase === "recovery" && state.day && !state.day.clearedAt;
+    dotD.style.background = showDayDot ? BAND_COLOR[band(debtRemaining(now()))] : "transparent";
+
+    const screen = document.getElementById("screen");
+    screen.innerHTML =
+      state.tab === "today" ? todayScreen()
+        : state.phase === "party" ? tonightLive()
+          : tonightIdle();
+
+    wire(opts);
+  }
+
+  function wire(opts) {
+    const on = (id, fn, evt = "click") => {
+      const node = document.getElementById(id);
+      if (node) node.addEventListener(evt, fn);
+    };
+
+    on("start-night", openHeadcount);
+    on("log-drink", logDrink);
+    on("undo-drink", undoDrink);
+    on("end-night", endNight);
+    on("show-rules", openRules);
+    on("connect-pill", connect);
+
+    document.querySelectorAll("[data-face]").forEach((btn) =>
+      btn.addEventListener("click", () => setFace(Number(btn.dataset.face))));
+
+    if (opts.bumpDrink) {
+      const count = document.getElementById("drink-count");
+      if (count) count.classList.add("bump");
+    }
+    if (opts.landed) {
+      const card = document.getElementById("roll-card");
+      if (card) card.classList.add("landed");
+    }
+  }
+
+  /* ========== sheets ========== */
+
+  const host = document.getElementById("sheet-host");
+  const closeSheet = () => (host.innerHTML = "");
+
+  function openSheet(inner) {
+    host.innerHTML = `<div class="sheet-scrim"><div class="sheet">${inner}</div></div>`;
+    host.querySelector(".sheet-scrim").addEventListener("click", (e) => {
+      if (e.target === e.currentTarget) closeSheet();
+    });
+  }
+
+  function openHeadcount() {
+    openSheet(`
+      <div class="stack" style="gap:6px">
+        <p class="eyebrow">HOW MANY PLAYERS?</p>
+        <p class="muted">The cube splits the night between everyone at the table.</p>
+      </div>
+      <div class="headcount" id="hc-value">${T.defaultHeadcount}</div>
+      <input type="range" id="hc" min="1" max="10" step="1" value="${T.defaultHeadcount}">
+      <button class="big-btn" id="hc-go" style="--btn: var(--party)">Let's go</button>`);
+
+    const slider = document.getElementById("hc");
+    slider.addEventListener("input", () => {
+      document.getElementById("hc-value").textContent = slider.value;
+    });
+    document.getElementById("hc-go").addEventListener("click", () => {
+      closeSheet();
+      startNight(Number(slider.value));
+    });
+  }
+
+  function openRules() {
+    openSheet(`
+      <p class="strong">Whatever it lands on, the table plays.</p>
+      ${ruleDeckHTML()}
+      <button class="big-btn" id="rules-back" style="--btn: var(--party)">Back to the game</button>`);
+    document.getElementById("rules-back").addEventListener("click", closeSheet);
+  }
+
+  function showSummary(session, startingDebt) {
+    const perPlayer = session.headcount > 0 ? session.drinks.length / session.headcount : session.drinks.length;
+    openSheet(`
+      <div class="stack" style="gap:6px">
+        <p class="eyebrow">THE NIGHT</p>
+        <h2 style="margin:0;font-size:26px;font-weight:900">${session.drinks.length ? "Cube's had enough." : "Quiet one."}</h2>
+      </div>
+      <div class="tiles two">${tilesHTML([
+        { value: session.drinks.length, label: "table drinks" },
+        { value: perPlayer.toFixed(1), label: "per player" },
+      ])}</div>
+      <div class="tiles two">${tilesHTML([
+        { value: session.rolls.length, label: "rolls" },
+        { value: compactDuration(session.endedAt - session.startedAt), label: "duration" },
+      ])}</div>
+      <p class="muted">${startingDebt <= 0
+        ? "Nothing to sleep off. The cube wakes up green."
+        : `Tomorrow the cube wakes up at ${Math.round(startingDebt)}. You'll help it down.`}</p>
+      <button class="big-btn" id="to-today">See you tomorrow ☀️</button>`);
+
+    document.getElementById("to-today").addEventListener("click", () => {
+      closeSheet();
+      state.tab = "today";
+      render();
+    });
+    render();
+  }
+
+  /* ========== live cube ========== */
+
   const SERVICE = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
   const FACE_CHAR = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
   const EVENT_CHAR = "beb5483e-36e1-4688-b7f5-ea07361b26a9";
 
-  const EVENT_ROLL = 0x01;
-  const EVENT_TAP = 0x02;
-
-  // Face index 0-5, in Mode.allCases order. Colours from Models.swift.
-  const MODES = [
-    { name: "Deep Work", color: "#3987E5" },
-    { name: "Move", color: "#D95926" },
-    { name: "Create", color: "#D55181" },
-    { name: "Social", color: "#C98500" },
-    { name: "Rest", color: "#199E70" },
-    { name: "Hydrate", color: "#2FA8C9" },
-  ];
-
-  // Which of the 9 grid cells are lit, per pip count 1-6.
-  const PIPS = {
-    1: [4],
-    2: [0, 8],
-    3: [0, 4, 8],
-    4: [0, 2, 6, 8],
-    5: [0, 2, 4, 6, 8],
-    6: [0, 2, 3, 5, 6, 8],
-  };
-
-  const el = (id) => document.getElementById(id);
-  const die = el("die");
-  const pips = [...die.querySelectorAll(".pip")];
-  const feed = el("feed");
-  const feedEmpty = el("feed-empty");
-
-  let face = null;
-  let stats = { flips: 0, rolls: 0, taps: 0 };
-
-  function setStatus(state, text) {
-    const node = el("status");
-    node.dataset.state = state;
-    el("status-text").textContent = text;
-  }
-
-  function clockNow() {
-    // 24-hour, so the column never wraps onto a second line.
-    return new Date().toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hourCycle: "h23",
-    });
-  }
-
-  function log(kind, label) {
-    feedEmpty.hidden = true;
-    const li = document.createElement("li");
-    const time = document.createElement("time");
-    time.textContent = clockNow();
-    const text = document.createElement("span");
-    text.textContent = label;
-    const tag = document.createElement("span");
-    tag.className = "kind";
-    tag.dataset.k = kind;
-    tag.textContent = kind;
-    li.append(time, text, tag);
-    feed.prepend(li);
-    while (feed.children.length > 41) feed.lastElementChild.remove();
-  }
-
-  function paint() {
-    const mode = MODES[face];
-    document.documentElement.style.setProperty("--face", mode.color);
-    document.documentElement.style.setProperty("--face-soft", mode.color + "1f");
-
-    const lit = PIPS[face + 1];
-    pips.forEach((pip, i) => pip.classList.toggle("hidden", !lit.includes(i)));
-
-    el("face-name").textContent = mode.name;
-    el("face-meta").textContent = `Face index ${face} · ${face + 1} pip${face ? "s" : ""}`;
-  }
-
-  function setFace(next, source) {
-    if (next < 0 || next >= MODES.length) return;
-    if (next === face) return;
-    face = next;
-    stats.flips++;
-    el("s-flips").textContent = stats.flips;
-    paint();
-    log("face", `${MODES[face].name}${source === "sim" ? " (manual)" : ""}`);
-  }
-
-  function onRoll() {
-    stats.rolls++;
-    el("s-rolls").textContent = stats.rolls;
-    die.classList.remove("rolling");
-    void die.offsetWidth; // restart the animation
-    die.classList.add("rolling");
-    const landed = face === null ? "no face yet" : MODES[face].name;
-    log("roll", `Roll settled on ${landed}`);
-  }
-
-  function onTap() {
-    stats.taps++;
-    el("s-taps").textContent = stats.taps;
-    log("tap", "Double tap");
-  }
-
-  /* ---------------- Web Bluetooth ---------------- */
-
   async function connect() {
     if (!navigator.bluetooth) {
-      setStatus("sim", "No Web Bluetooth");
-      el("note").textContent =
-        "This browser has no Web Bluetooth, so the cube can't be reached from here. " +
-        "Use Chrome or Edge on desktop or Android — or drive it with the manual controls below.";
+      alert("This browser has no Web Bluetooth. Use Chrome or Edge on desktop or Android — " +
+            "or drive the cube by hand: keys 1-6 set a face, D logs a drink, R rolls.");
       return;
     }
-
     try {
-      setStatus("idle", "Choosing device…");
-      const device = await navigator.bluetooth.requestDevice({
-        filters: [{ services: [SERVICE] }],
-      });
-
-      setStatus("idle", "Connecting…");
+      const device = await navigator.bluetooth.requestDevice({ filters: [{ services: [SERVICE] }] });
       device.addEventListener("gattserverdisconnected", () => {
-        setStatus("idle", "Cube disconnected");
-        log("face", "Cube disconnected");
+        state.connected = false;
+        render();
       });
 
       const server = await device.gatt.connect();
       const service = await server.getPrimaryService(SERVICE);
 
       const faceChar = await service.getCharacteristic(FACE_CHAR);
-      faceChar.addEventListener("characteristicvaluechanged", (e) =>
-        setFace(e.target.value.getUint8(0), "ble")
-      );
+      faceChar.addEventListener("characteristicvaluechanged", (e) => setFace(e.target.value.getUint8(0)));
       await faceChar.startNotifications();
+      setFace((await faceChar.readValue()).getUint8(0));
 
-      const initial = await faceChar.readValue();
-      setFace(initial.getUint8(0), "ble");
-
-      // The event characteristic is optional — a firmware without it should
-      // still give a working face demo.
       try {
         const eventChar = await service.getCharacteristic(EVENT_CHAR);
         eventChar.addEventListener("characteristicvaluechanged", (e) => {
           const byte = e.target.value.getUint8(0);
-          if (byte === EVENT_ROLL) onRoll();
-          else if (byte === EVENT_TAP) onTap();
+          if (byte === 0x01) registerRoll(state.currentFace);
+          else if (byte === 0x02) logDrink();
         });
         await eventChar.startNotifications();
-      } catch {
-        log("face", "No event characteristic — faces only");
-      }
+      } catch { /* face-only firmware still demos */ }
 
-      setStatus("live", `Live · ${device.name || "Cube"}`);
-      el("note").textContent = "Connected. Flip, tap and roll the cube — every event lands here.";
+      state.connected = true;
+      render();
     } catch (err) {
-      if (err && err.name === "NotFoundError") {
-        setStatus("idle", "No cube picked");
-        return;
-      }
-      setStatus("sim", "Connection failed");
-      el("note").textContent =
-        "Couldn't reach the cube: " + (err && err.message ? err.message : err) +
-        " — the manual controls below still work.";
+      if (err && err.name === "NotFoundError") return;
+      alert("Couldn't reach the cube: " + (err && err.message ? err.message : err) +
+            "\n\nDrive it by hand instead: 1-6 set a face, D logs a drink, R rolls.");
     }
   }
 
-  el("connect").addEventListener("click", connect);
-
-  /* ---------------- manual controls ---------------- */
-
-  const sim = el("sim");
-  MODES.forEach((mode, i) => {
-    const button = document.createElement("button");
-    button.textContent = `${i + 1} · ${mode.name}`;
-    button.addEventListener("click", () => setFace(i, "sim"));
-    sim.append(button);
-  });
-
-  const rollButton = document.createElement("button");
-  rollButton.textContent = "Roll";
-  rollButton.addEventListener("click", () => {
-    setFace(Math.floor(Math.random() * MODES.length), "sim");
-    onRoll();
-  });
-
-  const tapButton = document.createElement("button");
-  tapButton.textContent = "Double tap";
-  tapButton.addEventListener("click", onTap);
-
-  sim.append(rollButton, tapButton);
+  /* ========== keyboard fallback ========== */
 
   addEventListener("keydown", (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
-    if (e.key >= "1" && e.key <= "6") setFace(Number(e.key) - 1, "sim");
-    else if (e.key.toLowerCase() === "d") onTap();
-    else if (e.key.toLowerCase() === "r") rollButton.click();
+    if (e.target instanceof Element && e.target.matches("input, button")) return;
+    const k = e.key.toLowerCase();
+    if (e.key >= "1" && e.key <= "6") setFace(Number(e.key) - 1);
+    else if (k === "d") logDrink();
+    else if (k === "r") registerRoll(Math.floor(Math.random() * 6));
+    else if (k === "t") { state.tab = state.tab === "tonight" ? "today" : "tonight"; render(); }
   });
 
-  // Start on a face so the hero isn't empty on load.
-  setFace(0, "boot");
-  feed.replaceChildren(feedEmpty);
-  feedEmpty.hidden = false;
-  stats.flips = 0;
-  el("s-flips").textContent = "0";
+  document.getElementById("tab-tonight").addEventListener("click", () => { state.tab = "tonight"; render(); });
+  document.getElementById("tab-today").addEventListener("click", () => { state.tab = "today"; render(); });
+
+  // Live figures tick without rebuilding the screen — rerendering would fight
+  // the slider, the sheets and the animations.
+  setInterval(() => {
+    const at = now();
+    if (state.phase === "party" && state.session) {
+      const clock = document.getElementById("session-clock");
+      if (clock) clock.textContent = compactDuration(at - state.session.startedAt);
+    }
+    if (state.tab === "today" && state.day) {
+      const debt = debtRemaining(at);
+      const b = band(debt);
+      const num = document.getElementById("debt-number");
+      if (num) { num.textContent = Math.round(debt); num.style.color = BAND_COLOR[b]; }
+      const bar = document.getElementById("debt-bar");
+      if (bar) {
+        bar.style.width = `${Math.min(1, Math.max(0, debt / state.day.startingDebt)) * 100}%`;
+        bar.style.background = BAND_COLOR[b];
+      }
+      const paid = document.getElementById("paid-line");
+      if (paid) paid.textContent = `${Math.round(earned(state.day, at))} paid down today`;
+      const earn = document.getElementById("earning");
+      if (earn) earn.textContent = `+${activePoints(state.day, at).toFixed(1)}`;
+      const et = document.getElementById("earning-time");
+      if (et && state.day.active) et.textContent = compactDuration(at - state.day.active.startedAt);
+    }
+  }, 1000);
+
+  render();
 </script>
