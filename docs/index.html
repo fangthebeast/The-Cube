@@ -706,8 +706,12 @@
   }
 
   function connectPillHTML() {
-    return `<div class="pill ${state.connected ? "on" : ""}" id="connect-pill" role="button" tabindex="0">
-      <i></i>${state.connected ? "Cube on the wire" : "Plug in the cube"}
+    const n = cubes.length;
+    const label = n === 0 ? "Plug in the cube"
+      : n === 1 ? "Cube on the wire · add another"
+        : `${n} cubes on the wire · add another`;
+    return `<div class="pill ${n ? "on" : ""}" id="connect-pill" role="button" tabindex="0">
+      <i></i>${label}
     </div>`;
   }
 
@@ -1022,7 +1026,10 @@
      have to guess which face it landed on. */
 
   const BAUD = 115200;
-  let serialPort = null;
+
+  // More than one cube can be on the wire at once. Every cube feeds the same
+  // session — either one's roll is a roll, either one's tap is a drink.
+  const cubes = [];
 
   function handleLine(line) {
     const [verb, arg] = line.trim().split(/\s+/);
@@ -1030,6 +1037,13 @@
     else if (verb === "ROLL") registerRoll(Number(arg));
     else if (verb === "TAP") logDrink();
     else if (verb === "CUBE") { state.connected = true; render(); }
+  }
+
+  function dropCube(port) {
+    const i = cubes.indexOf(port);
+    if (i >= 0) cubes.splice(i, 1);
+    state.connected = cubes.length > 0;
+    render();
   }
 
   async function readLoop(port) {
@@ -1050,11 +1064,10 @@
       }
     } catch { /* unplugged mid-read */ }
 
-    state.connected = false;
-    serialPort = null;
-    render();
+    dropCube(port);
   }
 
+  // Always opens the picker, so this is also how a second cube joins.
   async function connect() {
     if (!navigator.serial) {
       alert("This browser has no Web Serial. Use Chrome or Edge on a desktop — " +
@@ -1062,28 +1075,24 @@
             "You can still drive the cube by hand: 1-6 set a face, D logs a drink, R rolls.");
       return;
     }
-    if (serialPort) { await disconnect(); return; }
 
     try {
       const port = await navigator.serial.requestPort();
+      if (cubes.includes(port)) {
+        alert("That cube is already on the wire. Pick the other port to add a second one.");
+        return;
+      }
       await port.open({ baudRate: BAUD });
-      serialPort = port;
+      cubes.push(port);
       state.connected = true;
       render();
       readLoop(port);
     } catch (err) {
       if (err && err.name === "NotFoundError") return;   // picker dismissed
-      alert("Couldn't open the cube's port: " + (err && err.message ? err.message : err) +
+      alert("Couldn't open that cube's port: " + (err && err.message ? err.message : err) +
             "\n\nClose the Arduino Serial Monitor if it's open — it holds the port.\n" +
             "Or drive the cube by hand: 1-6 set a face, D logs a drink, R rolls.");
     }
-  }
-
-  async function disconnect() {
-    try { await serialPort.close(); } catch { /* already gone */ }
-    serialPort = null;
-    state.connected = false;
-    render();
   }
 
   /* ========== keyboard fallback ========== */
