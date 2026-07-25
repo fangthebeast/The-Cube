@@ -707,7 +707,7 @@
 
   function connectPillHTML() {
     return `<div class="pill ${state.connected ? "on" : ""}" id="connect-pill" role="button" tabindex="0">
-      <i></i>${state.connected ? "Cube connected" : "Connect the cube"}
+      <i></i>${state.connected ? "Cube on the wire" : "Plug in the cube"}
     </div>`;
   }
 
@@ -1015,50 +1015,75 @@
     render();
   }
 
-  /* ========== live cube ========== */
+  /* ========== live cube, over the USB wire ==========
+     The firmware (firmware/CubeSerial) emits one event per line at 115200:
+       CUBE READY / FACE <0-5> / ROLL <0-5> / TAP
+     ROLL is always preceded by its own FACE line, so the roll handler doesn't
+     have to guess which face it landed on. */
 
-  const SERVICE = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
-  const FACE_CHAR = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
-  const EVENT_CHAR = "beb5483e-36e1-4688-b7f5-ea07361b26a9";
+  const BAUD = 115200;
+  let serialPort = null;
+
+  function handleLine(line) {
+    const [verb, arg] = line.trim().split(/\s+/);
+    if (verb === "FACE") setFace(Number(arg));
+    else if (verb === "ROLL") registerRoll(Number(arg));
+    else if (verb === "TAP") logDrink();
+    else if (verb === "CUBE") { state.connected = true; render(); }
+  }
+
+  async function readLoop(port) {
+    const decoder = new TextDecoderStream();
+    port.readable.pipeTo(decoder.writable).catch(() => {});
+    const reader = decoder.readable.getReader();
+    let buffer = "";
+
+    try {
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += value;
+        // Keep the trailing fragment — a read can split mid-line.
+        const lines = buffer.split("\n");
+        buffer = lines.pop();
+        lines.forEach((l) => l.trim() && handleLine(l));
+      }
+    } catch { /* unplugged mid-read */ }
+
+    state.connected = false;
+    serialPort = null;
+    render();
+  }
 
   async function connect() {
-    if (!navigator.bluetooth) {
-      alert("This browser has no Web Bluetooth. Use Chrome or Edge on desktop or Android — " +
-            "or drive the cube by hand: keys 1-6 set a face, D logs a drink, R rolls.");
+    if (!navigator.serial) {
+      alert("This browser has no Web Serial. Use Chrome or Edge on a desktop — " +
+            "Safari and Firefox don't support it, and neither does any browser on iOS.\n\n" +
+            "You can still drive the cube by hand: 1-6 set a face, D logs a drink, R rolls.");
       return;
     }
+    if (serialPort) { await disconnect(); return; }
+
     try {
-      const device = await navigator.bluetooth.requestDevice({ filters: [{ services: [SERVICE] }] });
-      device.addEventListener("gattserverdisconnected", () => {
-        state.connected = false;
-        render();
-      });
-
-      const server = await device.gatt.connect();
-      const service = await server.getPrimaryService(SERVICE);
-
-      const faceChar = await service.getCharacteristic(FACE_CHAR);
-      faceChar.addEventListener("characteristicvaluechanged", (e) => setFace(e.target.value.getUint8(0)));
-      await faceChar.startNotifications();
-      setFace((await faceChar.readValue()).getUint8(0));
-
-      try {
-        const eventChar = await service.getCharacteristic(EVENT_CHAR);
-        eventChar.addEventListener("characteristicvaluechanged", (e) => {
-          const byte = e.target.value.getUint8(0);
-          if (byte === 0x01) registerRoll(state.currentFace);
-          else if (byte === 0x02) logDrink();
-        });
-        await eventChar.startNotifications();
-      } catch { /* face-only firmware still demos */ }
-
+      const port = await navigator.serial.requestPort();
+      await port.open({ baudRate: BAUD });
+      serialPort = port;
       state.connected = true;
       render();
+      readLoop(port);
     } catch (err) {
-      if (err && err.name === "NotFoundError") return;
-      alert("Couldn't reach the cube: " + (err && err.message ? err.message : err) +
-            "\n\nDrive it by hand instead: 1-6 set a face, D logs a drink, R rolls.");
+      if (err && err.name === "NotFoundError") return;   // picker dismissed
+      alert("Couldn't open the cube's port: " + (err && err.message ? err.message : err) +
+            "\n\nClose the Arduino Serial Monitor if it's open — it holds the port.\n" +
+            "Or drive the cube by hand: 1-6 set a face, D logs a drink, R rolls.");
     }
+  }
+
+  async function disconnect() {
+    try { await serialPort.close(); } catch { /* already gone */ }
+    serialPort = null;
+    state.connected = false;
+    render();
   }
 
   /* ========== keyboard fallback ========== */
