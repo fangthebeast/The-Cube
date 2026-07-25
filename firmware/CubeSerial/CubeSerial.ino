@@ -9,8 +9,12 @@
 //
 //   CUBE READY      once at boot
 //   FACE <0-5>      the settled face changed; index matches Mode.allCases
-//   ROLL <0-5>      a roll settled on that face (always after its FACE line)
-//   TAP             a double tap
+//   ROLL <0-5>      a single tap — commits whatever face is up as a roll
+//   TAP             a double tap — one drink
+//
+// Rolling is a single tap rather than a physical tumble: land the cube on the
+// face you want, tap once, and that face is the roll. Tumble detection was
+// too easy to trip by nudging the cube on a crowded table.
 //
 // Wiring: VCC->3.3V, GND->GND, SDA->GPIO21, SCL->GPIO22, AD0->GND (addr 0x68)
 
@@ -34,12 +38,9 @@ const unsigned long TAP_REQUIRE_REST_MS = 120;
 // --- Motion / roll detection ---
 const float REST_BAND_G = 0.15;
 const float ROLL_MOTION_G = 0.35;
-const unsigned long MOTION_GAP_MS = 120;
-const unsigned long ROLL_MIN_MOTION_MS = 250;
 const unsigned long ROLL_SETTLE_MS = 500;
 
 bool inMotion = false;
-unsigned long motionStart = 0;
 unsigned long lastMotionAt = 0;
 unsigned long quietSince = 0;
 
@@ -128,13 +129,19 @@ void loop() {
     }
   }
 
+  // No second tap inside the window, so that was a single tap — a roll.
+  // Whatever face is up is the one being committed.
   if (waitingForSecondTap && (now - firstTapTime) > DOUBLE_TAP_WINDOW_MS) {
-    waitingForSecondTap = false;   // a lone tap; the app has no use for it
+    waitingForSecondTap = false;
+    int8_t face = (reportedFace >= 0)
+      ? reportedFace
+      : (int8_t)faceIndexFromPips(faceFromAccel(gx, gy, gz));
+    Serial.print("ROLL ");
+    Serial.println(face);
   }
 
   // --- Motion ---
   if (dev > ROLL_MOTION_G) {
-    if (!inMotion || (now - lastMotionAt) > MOTION_GAP_MS) motionStart = now;
     inMotion = true;
     lastMotionAt = now;
     quietSince = 0;
@@ -155,18 +162,9 @@ void loop() {
     }
   }
 
-  // --- Roll settled ---
-  if (inMotion && settled) {
-    unsigned long motionDuration = lastMotionAt - motionStart;
-    inMotion = false;
-
-    if (motionDuration >= ROLL_MIN_MOTION_MS) {
-      int8_t face = (int8_t)faceIndexFromPips(faceFromAccel(gx, gy, gz));
-      if (face != reportedFace) reportFace((uint8_t)face);
-      Serial.print("ROLL ");
-      Serial.println(face);
-    }
-  }
+  // Motion still gets tracked, but only to gate taps — a tumbling cube must
+  // not read as tapping. Coming to rest no longer emits a roll on its own.
+  if (inMotion && settled) inMotion = false;
 
   delay(5);
 }
