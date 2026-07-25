@@ -1,0 +1,672 @@
+<title>The Cube — Live</title>
+
+<style>
+  :root {
+    color-scheme: light dark;
+
+    /* Neutrals carry a slate-blue bias so they sit with the face accents
+       rather than fighting them. */
+    --ground: #eef1f6;
+    --panel: #ffffff;
+    --panel-edge: #d4dae6;
+    --ink: #10151f;
+    --ink-soft: #4d5a70;
+    --ink-faint: #8592a8;
+    --rail: #dde3ed;
+
+    /* Overwritten at runtime by the live face. */
+    --face: #3987e5;
+    --face-soft: #3987e51a;
+
+    --ok: #199e70;
+    --warn: #c98500;
+
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #0b0f16;
+      --panel: #141a24;
+      --panel-edge: #232c3a;
+      --ink: #eef2f8;
+      --ink-soft: #9aa8be;
+      --ink-faint: #66748c;
+      --rail: #202836;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #0b0f16;
+    --panel: #141a24;
+    --panel-edge: #232c3a;
+    --ink: #eef2f8;
+    --ink-soft: #9aa8be;
+    --ink-faint: #66748c;
+    --rail: #202836;
+  }
+
+  :root[data-theme="light"] {
+    --ground: #eef1f6;
+    --panel: #ffffff;
+    --panel-edge: #d4dae6;
+    --ink: #10151f;
+    --ink-soft: #4d5a70;
+    --ink-faint: #8592a8;
+    --rail: #dde3ed;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: clamp(16px, 3vw, 32px);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  /* ---------------- header ---------------- */
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--rail);
+  }
+
+  .title {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .title h1 {
+    margin: 0;
+    font-size: clamp(20px, 3vw, 26px);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .title span {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  .head-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--panel-edge);
+    background: var(--panel);
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    color: var(--ink-soft);
+  }
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--ink-faint);
+    flex: none;
+  }
+
+  .status[data-state="live"] .dot { background: var(--ok); }
+  .status[data-state="live"] { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, var(--panel-edge)); }
+  .status[data-state="sim"] .dot { background: var(--warn); }
+  .status[data-state="sim"] { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, var(--panel-edge)); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .status[data-state="live"] .dot { animation: breathe 2s ease-in-out infinite; }
+  }
+
+  @keyframes breathe { 50% { opacity: 0.35; } }
+
+  button {
+    font: inherit;
+    cursor: pointer;
+    border-radius: 8px;
+    border: 1px solid var(--panel-edge);
+    background: var(--panel);
+    color: var(--ink);
+    padding: 8px 14px;
+    transition: border-color 0.15s, background 0.15s;
+  }
+
+  button:hover { border-color: var(--face); }
+  button:focus-visible { outline: 2px solid var(--face); outline-offset: 2px; }
+
+  .connect {
+    background: var(--face);
+    border-color: var(--face);
+    color: #fff;
+    font-weight: 600;
+  }
+
+  .connect:hover { filter: brightness(1.08); border-color: var(--face); }
+
+  /* ---------------- main grid ---------------- */
+
+  .grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 20px;
+  }
+
+  @media (max-width: 760px) {
+    .grid { grid-template-columns: minmax(0, 1fr); }
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: 14px;
+    padding: 20px;
+  }
+
+  .panel h2 {
+    margin: 0 0 14px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  /* ---------------- the die ---------------- */
+
+  .face-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    /* The live face tints its own panel — the one place hardware state
+       colours the chrome. */
+    background: linear-gradient(180deg, var(--face-soft), transparent 60%), var(--panel);
+    border-color: color-mix(in srgb, var(--face) 30%, var(--panel-edge));
+  }
+
+  .die {
+    width: min(260px, 62vw);
+    aspect-ratio: 1;
+    border-radius: 22px;
+    background: var(--face);
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    padding: 14%;
+    gap: 8%;
+    box-shadow: 0 18px 40px -18px var(--face);
+    transition: background 0.35s ease;
+  }
+
+  .die.rolling { animation: tumble 0.5s ease; }
+
+  @keyframes tumble {
+    30% { transform: rotate(-9deg) scale(0.95); }
+    65% { transform: rotate(7deg) scale(1.03); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .die.rolling { animation: none; }
+  }
+
+  .pip {
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: inset 0 -2px 4px rgba(0, 0, 0, 0.18);
+  }
+
+  .pip.hidden { visibility: hidden; }
+
+  .face-name {
+    font-size: clamp(26px, 4.5vw, 36px);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    text-align: center;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  .face-meta {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: -12px 0 0;
+  }
+
+  /* ---------------- stats ---------------- */
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+
+  .stat {
+    border: 1px solid var(--panel-edge);
+    border-radius: 10px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .stat b {
+    font-family: var(--mono);
+    font-size: 24px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+
+  .stat span {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  /* ---------------- event feed ---------------- */
+
+  .feed {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  .feed li {
+    display: grid;
+    grid-template-columns: 66px 1fr auto;
+    gap: 10px;
+    align-items: baseline;
+    padding: 8px 2px;
+    border-bottom: 1px solid var(--rail);
+    font-size: 14px;
+  }
+
+  .feed li:last-child { border-bottom: 0; }
+
+  .feed time {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-faint);
+  }
+
+  .feed .kind {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 999px;
+    border: 1px solid var(--panel-edge);
+    color: var(--ink-soft);
+    white-space: nowrap;
+  }
+
+  .feed .kind[data-k="tap"] { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 45%, transparent); }
+  .feed .kind[data-k="roll"] { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
+
+  .empty {
+    color: var(--ink-faint);
+    font-size: 14px;
+    padding: 8px 2px;
+  }
+
+  /* ---------------- manual controls ---------------- */
+
+  .sim {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .sim button {
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 7px 11px;
+  }
+
+  .hint {
+    margin: 12px 0 0;
+    font-size: 13px;
+    color: var(--ink-faint);
+  }
+
+  kbd {
+    font-family: var(--mono);
+    font-size: 11px;
+    border: 1px solid var(--panel-edge);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    padding: 1px 5px;
+    color: var(--ink-soft);
+  }
+
+  .note {
+    font-size: 13px;
+    color: var(--ink-soft);
+    border-left: 2px solid var(--face);
+    padding-left: 12px;
+    margin: 0;
+  }
+
+  footer {
+    border-top: 1px solid var(--rail);
+    padding-top: 14px;
+    font-size: 12px;
+    color: var(--ink-faint);
+    font-family: var(--mono);
+    letter-spacing: 0.04em;
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="title">
+      <h1>The Cube</h1>
+      <span>Live telemetry</span>
+    </div>
+    <div class="head-actions">
+      <div class="status" id="status" data-state="idle">
+        <i class="dot"></i><span id="status-text">Not connected</span>
+      </div>
+      <button class="connect" id="connect">Connect cube</button>
+    </div>
+  </header>
+
+  <div class="grid">
+    <section class="panel face-panel">
+      <div class="die" id="die" aria-live="polite" aria-label="Cube face">
+        <i class="pip"></i><i class="pip"></i><i class="pip"></i>
+        <i class="pip"></i><i class="pip"></i><i class="pip"></i>
+        <i class="pip"></i><i class="pip"></i><i class="pip"></i>
+      </div>
+      <h2 class="face-name" id="face-name">Waiting for the cube</h2>
+      <p class="face-meta" id="face-meta">No face reported</p>
+    </section>
+
+    <section class="panel">
+      <h2>This session</h2>
+      <div class="stats">
+        <div class="stat"><b id="s-flips">0</b><span>Flips</span></div>
+        <div class="stat"><b id="s-rolls">0</b><span>Rolls</span></div>
+        <div class="stat"><b id="s-taps">0</b><span>Double taps</span></div>
+      </div>
+
+      <h2>Event feed</h2>
+      <ul class="feed" id="feed">
+        <li class="empty" id="feed-empty">Nothing yet. Connect the cube, or drive it by hand below.</li>
+      </ul>
+    </section>
+  </div>
+
+  <section class="panel">
+    <h2>Drive by hand</h2>
+    <div class="sim" id="sim"></div>
+    <p class="hint">
+      Keyboard: <kbd>1</kbd>–<kbd>6</kbd> set a face · <kbd>D</kbd> double tap · <kbd>R</kbd> roll
+    </p>
+  </section>
+
+  <p class="note" id="note">
+    Live connection needs Web Bluetooth — Chrome or Edge on desktop or Android.
+    iOS Safari has no Web Bluetooth at all, so on an iPhone the manual controls
+    are the way to drive this.
+  </p>
+
+  <footer>
+    Service 4FAFC201 · face + event characteristics · face index 0–5
+  </footer>
+</div>
+
+<script>
+  "use strict";
+
+  // Matches the firmware and CubeBLEManager.swift.
+  const SERVICE = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+  const FACE_CHAR = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+  const EVENT_CHAR = "beb5483e-36e1-4688-b7f5-ea07361b26a9";
+
+  const EVENT_ROLL = 0x01;
+  const EVENT_TAP = 0x02;
+
+  // Face index 0-5, in Mode.allCases order. Colours from Models.swift.
+  const MODES = [
+    { name: "Deep Work", color: "#3987E5" },
+    { name: "Move", color: "#D95926" },
+    { name: "Create", color: "#D55181" },
+    { name: "Social", color: "#C98500" },
+    { name: "Rest", color: "#199E70" },
+    { name: "Hydrate", color: "#2FA8C9" },
+  ];
+
+  // Which of the 9 grid cells are lit, per pip count 1-6.
+  const PIPS = {
+    1: [4],
+    2: [0, 8],
+    3: [0, 4, 8],
+    4: [0, 2, 6, 8],
+    5: [0, 2, 4, 6, 8],
+    6: [0, 2, 3, 5, 6, 8],
+  };
+
+  const el = (id) => document.getElementById(id);
+  const die = el("die");
+  const pips = [...die.querySelectorAll(".pip")];
+  const feed = el("feed");
+  const feedEmpty = el("feed-empty");
+
+  let face = null;
+  let stats = { flips: 0, rolls: 0, taps: 0 };
+
+  function setStatus(state, text) {
+    const node = el("status");
+    node.dataset.state = state;
+    el("status-text").textContent = text;
+  }
+
+  function clockNow() {
+    return new Date().toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  }
+
+  function log(kind, label) {
+    feedEmpty.hidden = true;
+    const li = document.createElement("li");
+    const time = document.createElement("time");
+    time.textContent = clockNow();
+    const text = document.createElement("span");
+    text.textContent = label;
+    const tag = document.createElement("span");
+    tag.className = "kind";
+    tag.dataset.k = kind;
+    tag.textContent = kind;
+    li.append(time, text, tag);
+    feed.prepend(li);
+    while (feed.children.length > 41) feed.lastElementChild.remove();
+  }
+
+  function paint() {
+    const mode = MODES[face];
+    document.documentElement.style.setProperty("--face", mode.color);
+    document.documentElement.style.setProperty("--face-soft", mode.color + "1f");
+
+    const lit = PIPS[face + 1];
+    pips.forEach((pip, i) => pip.classList.toggle("hidden", !lit.includes(i)));
+
+    el("face-name").textContent = mode.name;
+    el("face-meta").textContent = `Face index ${face} · ${face + 1} pip${face ? "s" : ""}`;
+  }
+
+  function setFace(next, source) {
+    if (next < 0 || next >= MODES.length) return;
+    if (next === face) return;
+    face = next;
+    stats.flips++;
+    el("s-flips").textContent = stats.flips;
+    paint();
+    log("face", `${MODES[face].name}${source === "sim" ? " (manual)" : ""}`);
+  }
+
+  function onRoll() {
+    stats.rolls++;
+    el("s-rolls").textContent = stats.rolls;
+    die.classList.remove("rolling");
+    void die.offsetWidth; // restart the animation
+    die.classList.add("rolling");
+    const landed = face === null ? "no face yet" : MODES[face].name;
+    log("roll", `Roll settled on ${landed}`);
+  }
+
+  function onTap() {
+    stats.taps++;
+    el("s-taps").textContent = stats.taps;
+    log("tap", "Double tap");
+  }
+
+  /* ---------------- Web Bluetooth ---------------- */
+
+  async function connect() {
+    if (!navigator.bluetooth) {
+      setStatus("sim", "No Web Bluetooth");
+      el("note").textContent =
+        "This browser has no Web Bluetooth, so the cube can't be reached from here. " +
+        "Use Chrome or Edge on desktop or Android — or drive it with the manual controls below.";
+      return;
+    }
+
+    try {
+      setStatus("idle", "Choosing device…");
+      const device = await navigator.bluetooth.requestDevice({
+        filters: [{ services: [SERVICE] }],
+      });
+
+      setStatus("idle", "Connecting…");
+      device.addEventListener("gattserverdisconnected", () => {
+        setStatus("idle", "Cube disconnected");
+        log("face", "Cube disconnected");
+      });
+
+      const server = await device.gatt.connect();
+      const service = await server.getPrimaryService(SERVICE);
+
+      const faceChar = await service.getCharacteristic(FACE_CHAR);
+      faceChar.addEventListener("characteristicvaluechanged", (e) =>
+        setFace(e.target.value.getUint8(0), "ble")
+      );
+      await faceChar.startNotifications();
+
+      const initial = await faceChar.readValue();
+      setFace(initial.getUint8(0), "ble");
+
+      // The event characteristic is optional — a firmware without it should
+      // still give a working face demo.
+      try {
+        const eventChar = await service.getCharacteristic(EVENT_CHAR);
+        eventChar.addEventListener("characteristicvaluechanged", (e) => {
+          const byte = e.target.value.getUint8(0);
+          if (byte === EVENT_ROLL) onRoll();
+          else if (byte === EVENT_TAP) onTap();
+        });
+        await eventChar.startNotifications();
+      } catch {
+        log("face", "No event characteristic — faces only");
+      }
+
+      setStatus("live", `Live · ${device.name || "Cube"}`);
+      el("note").textContent = "Connected. Flip, tap and roll the cube — every event lands here.";
+    } catch (err) {
+      if (err && err.name === "NotFoundError") {
+        setStatus("idle", "No cube picked");
+        return;
+      }
+      setStatus("sim", "Connection failed");
+      el("note").textContent =
+        "Couldn't reach the cube: " + (err && err.message ? err.message : err) +
+        " — the manual controls below still work.";
+    }
+  }
+
+  el("connect").addEventListener("click", connect);
+
+  /* ---------------- manual controls ---------------- */
+
+  const sim = el("sim");
+  MODES.forEach((mode, i) => {
+    const button = document.createElement("button");
+    button.textContent = `${i + 1} · ${mode.name}`;
+    button.addEventListener("click", () => setFace(i, "sim"));
+    sim.append(button);
+  });
+
+  const rollButton = document.createElement("button");
+  rollButton.textContent = "Roll";
+  rollButton.addEventListener("click", () => {
+    setFace(Math.floor(Math.random() * MODES.length), "sim");
+    onRoll();
+  });
+
+  const tapButton = document.createElement("button");
+  tapButton.textContent = "Double tap";
+  tapButton.addEventListener("click", onTap);
+
+  sim.append(rollButton, tapButton);
+
+  addEventListener("keydown", (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key >= "1" && e.key <= "6") setFace(Number(e.key) - 1, "sim");
+    else if (e.key.toLowerCase() === "d") onTap();
+    else if (e.key.toLowerCase() === "r") rollButton.click();
+  });
+
+  // Start on a face so the hero isn't empty on load.
+  setFace(0, "boot");
+  feed.replaceChildren(feedEmpty);
+  feedEmpty.hidden = false;
+  stats.flips = 0;
+  el("s-flips").textContent = "0";
+</script>
