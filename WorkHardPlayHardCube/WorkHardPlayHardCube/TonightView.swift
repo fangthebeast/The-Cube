@@ -9,6 +9,7 @@ struct TonightView: View {
     @EnvironmentObject private var ui: UIState
 
     @State private var showHeadcount = false
+    @State private var showRules = false
     @State private var showSummary = false
     @State private var headcount = Double(Tunables.defaultHeadcount)
 
@@ -22,6 +23,7 @@ struct TonightView: View {
         }
         .sheet(isPresented: $showHeadcount) { headcountSheet }
         .sheet(isPresented: $showSummary) { summarySheet }
+        .sheet(isPresented: $showRules) { rulesSheet }
     }
 
     // MARK: - Idle
@@ -53,6 +55,8 @@ struct TonightView: View {
                     headcount = Double(Tunables.defaultHeadcount)
                     showHeadcount = true
                 }
+
+                RuleDeckCard()
 
                 if let last = store.lastSummary {
                     lastNightCard(last)
@@ -142,10 +146,18 @@ struct TonightView: View {
                          title: "Roll it.",
                          accent: Theme.party)
             Spacer(minLength: 8)
-            if let session = store.session {
-                Text(session.duration.compactDuration)
-                    .font(.system(size: 13, weight: .bold, design: .monospaced))
-                    .foregroundStyle(palette.inkMuted)
+            VStack(alignment: .trailing, spacing: 4) {
+                if let session = store.session {
+                    Text(session.duration.compactDuration)
+                        .font(.system(size: 13, weight: .bold, design: .monospaced))
+                        .foregroundStyle(palette.inkMuted)
+                }
+                Button { showRules = true } label: {
+                    Text("Rules")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Theme.party)
+                }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -240,6 +252,20 @@ struct TonightView: View {
         .padding(24)
         .background(palette.paper.ignoresSafeArea())
         .presentationDetents([.large])
+    }
+
+    private var rulesSheet: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                Text("Whatever it lands on, the table plays.")
+                    .font(.system(size: 22, weight: .heavy))
+                    .foregroundStyle(palette.ink)
+                RuleDeckCard()
+                BigButton(title: "Back to the game", tint: Theme.party) { showRules = false }
+            }
+            .padding(24)
+        }
+        .background(palette.paper.ignoresSafeArea())
     }
 
     private var summaryTitle: String {
@@ -348,5 +374,40 @@ private struct DrinkCounterView: View {
             }
         }
         .animation(.spring(duration: 0.3), value: count)
+    }
+}
+
+// The deck, spelled out. Same shape as the day tab's face list so the two
+// halves of the app read as one product.
+struct RuleDeckCard: View {
+    @Environment(\.palette) private var palette
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("THE DECK · \(RuleDeck.name.uppercased())")
+                .font(.system(size: 10.5, weight: .bold))
+                .kerning(0.8)
+                .foregroundStyle(palette.inkMuted)
+
+            VStack(spacing: 12) {
+                ForEach(RuleDeck.rules) { rule in
+                    HStack(spacing: 12) {
+                        DieFaceView(mode: Mode.fromFaceIndex(rule.pips - 1), size: 32)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(rule.name)
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(palette.ink)
+                            Text(rule.detail)
+                                .font(.system(size: 12))
+                                .foregroundStyle(palette.inkSecondary)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 16)
+            .card(cornerRadius: 20)
+        }
     }
 }

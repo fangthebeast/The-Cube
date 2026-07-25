@@ -10,6 +10,8 @@ enum Tunables {
     static let hydrateCooldown: TimeInterval = 30 * 60
     static let movePerMin = 1.0
     static let deepWorkPerMin = 0.5
+    static let createPerMin = 0.5
+    static let socialPerMin = 0.25
     static let restPerMin = 0.25
     static let decayPerHour = 2.0               // natural recovery, applied lazily
     static let defaultHeadcount = 4
@@ -54,14 +56,16 @@ enum Mode: String, CaseIterable, Codable {
         }
     }
 
-    // Not every face pays down debt — Create and Social are day meanings only.
-    var recoveryKind: RecoveryKind? {
+    // Every face pays the debt down — active faces just pay more. There is no
+    // face that does nothing.
+    var recoveryKind: RecoveryKind {
         switch self {
         case .deepWork: return .deepWork
         case .move: return .move
+        case .create: return .create
+        case .social: return .social
         case .rest: return .rest
         case .hydrate: return .hydrate
-        case .create, .social: return nil
         }
     }
 }
@@ -139,12 +143,14 @@ enum RuleDeck {
 
 // MARK: - Recovery
 enum RecoveryKind: String, Codable, CaseIterable {
-    case hydrate, move, deepWork, rest, decay
+    case hydrate, move, deepWork, create, social, rest, decay
 
     var pointsPerMinute: Double {
         switch self {
         case .move: return Tunables.movePerMin
         case .deepWork: return Tunables.deepWorkPerMin
+        case .create: return Tunables.createPerMin
+        case .social: return Tunables.socialPerMin
         case .rest: return Tunables.restPerMin
         case .hydrate, .decay: return 0        // hydrate is instant, decay is hourly
         }
@@ -155,6 +161,8 @@ enum RecoveryKind: String, Codable, CaseIterable {
         case .hydrate: return "Hydrate"
         case .move: return "Move"
         case .deepWork: return "Deep Work"
+        case .create: return "Create"
+        case .social: return "Social"
         case .rest: return "Rest"
         case .decay: return "Time passing"
         }
@@ -163,10 +171,11 @@ enum RecoveryKind: String, Codable, CaseIterable {
     var rateLabel: String {
         switch self {
         case .hydrate: return "+\(Int(Tunables.hydratePoints)) per glass"
-        case .move: return "+1.0 / min"
-        case .deepWork: return "+0.5 / min"
-        case .rest: return "+0.25 / min"
         case .decay: return "+2 / hr"
+        default:
+            let rate = pointsPerMinute
+            let text = rate == rate.rounded() ? String(format: "%.1f", rate) : String(format: "%g", rate)
+            return "+\(text) / min"
         }
     }
 
@@ -175,6 +184,8 @@ enum RecoveryKind: String, Codable, CaseIterable {
         case .hydrate: return Mode.hydrate.color
         case .move: return Mode.move.color
         case .deepWork: return Mode.deepWork.color
+        case .create: return Mode.create.color
+        case .social: return Mode.social.color
         case .rest: return Mode.rest.color
         case .decay: return Theme.neutral
         }

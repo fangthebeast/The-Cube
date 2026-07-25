@@ -150,12 +150,11 @@ final class AppStore: ObservableObject {
 
         if var day = phase.recoveryDay {
             commitActive(&day)
-            if let kind = mode.recoveryKind {
-                if kind == .hydrate {
-                    awardHydrate(&day)
-                } else {
-                    day.active = ActiveActivity(kind: kind, startedAt: Date())
-                }
+            let kind = mode.recoveryKind
+            if kind == .hydrate {
+                awardHydrate(&day)
+            } else {
+                day.active = ActiveActivity(kind: kind, startedAt: Date())
             }
             phase = .recovery(day)
             refreshLED()
