@@ -3,3 +3,6 @@ build/
 xcuserdata/
 *.xcuserstate
 .claude/
+
+# PlatformIO build output and vendored deps
+.pio/
