@@ -95,8 +95,9 @@ final class AppStore: ObservableObject {
         save()
     }
 
-    // One double-tap = one drink at the table. Neutral documentation only.
-    func registerDrinkTap() {
+    // The single drink code path: the cube's double-tap, the in-app button and
+    // the dev panel all land here. Neutral documentation only.
+    func logDrink() {
         guard var session = phase.session else { return }
         session.drinkTaps.append(Date())
         phase = .party(session)
@@ -104,6 +105,20 @@ final class AppStore: ObservableObject {
         markToday { $0.drinks += 1 }
         Haptics.tap(.light)
         save()
+    }
+
+    // Accidental taps at a party are guaranteed. Returns false if there was
+    // nothing to take back.
+    @discardableResult
+    func undoLastDrink() -> Bool {
+        guard var session = phase.session, !session.drinkTaps.isEmpty else { return false }
+        session.drinkTaps.removeLast()
+        phase = .party(session)
+        drinkPulse &+= 1
+        markToday { $0.drinks = max(0, $0.drinks - 1) }
+        Haptics.tap(.rigid)
+        save()
+        return true
     }
 
     // Ends the night, banks the summary, and opens the morning's recovery day.

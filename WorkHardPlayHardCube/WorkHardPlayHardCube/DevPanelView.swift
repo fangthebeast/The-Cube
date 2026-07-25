@@ -26,7 +26,7 @@ struct DevPanelView: View {
                 section("CUBE EVENTS") {
                     HStack(spacing: 10) {
                         smallButton("Roll", tint: Theme.party) { store.registerRoll(face: Mode.allCases.randomElement()) }
-                        smallButton("Double-tap", tint: Theme.party) { store.registerDrinkTap() }
+                        smallButton("Double-tap", tint: Theme.party) { store.logDrink() }
                     }
                     Text("Face up")
                         .font(.system(size: 11.5, weight: .semibold))

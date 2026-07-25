@@ -19,7 +19,7 @@ struct WorkHardPlayHardCubeApp: App {
             Task { @MainActor in store.registerRoll(face: face) }
         }
         ble.onDoubleTap = {
-            Task { @MainActor in store.registerDrinkTap() }
+            Task { @MainActor in store.logDrink() }
         }
         ble.onConnect = {
             Task { @MainActor in store.resendLED() }

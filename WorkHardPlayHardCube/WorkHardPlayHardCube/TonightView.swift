@@ -10,6 +10,7 @@ struct TonightView: View {
 
     @State private var showHeadcount = false
     @State private var showRules = false
+    @State private var showUndoToast = false
     @State private var showSummary = false
     @State private var headcount = Double(Tunables.defaultHeadcount)
 
@@ -138,6 +139,19 @@ struct TonightView: View {
         .padding(.horizontal, 18)
         .padding(.top, 8)
         .padding(.bottom, 18)
+        .overlay(alignment: .bottom) {
+            if showUndoToast {
+                Text("Drink removed")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(palette.ink)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(Capsule().fill(palette.surface))
+                    .overlay(Capsule().strokeBorder(palette.border, lineWidth: 1))
+                    .padding(.bottom, 76)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
     }
 
     private var boardHeader: some View {
@@ -190,7 +204,20 @@ struct TonightView: View {
     private var drinkCounter: some View {
         DrinkCounterView(count: store.drinkCount,
                          pulse: store.drinkPulse,
-                         promptsDrink: store.latestRule?.promptsDrink ?? false)
+                         promptsDrink: store.latestRule?.promptsDrink ?? false,
+                         onLog: { store.logDrink() },
+                         onUndo: {
+                             if store.undoLastDrink() { flashUndoToast() }
+                         })
+    }
+
+    // Brief confirmation that something came off the count.
+    private func flashUndoToast() {
+        withAnimation(.spring(duration: 0.25)) { showUndoToast = true }
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 1_400_000_000)
+            withAnimation(.easeOut(duration: 0.3)) { showUndoToast = false }
+        }
     }
 
     private var statsRow: some View {
@@ -338,31 +365,60 @@ private struct DrinkCounterView: View {
     let count: Int
     let pulse: Int
     let promptsDrink: Bool
+    let onLog: () -> Void
+    let onUndo: () -> Void
 
     @State private var bump: CGFloat = 1
 
     var body: some View {
-        VStack(spacing: 6) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text("\(count)")
-                    .font(.system(size: 44, weight: .black, design: .rounded))
-                    .foregroundStyle(palette.ink)
-                    .contentTransition(.numericText())
-                    .scaleEffect(bump)
-                Text(count == 1 ? "drink" : "drinks")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(palette.inkSecondary)
-                Spacer()
-                Text("double-tap = +1")
-                    .font(.system(size: 11.5, weight: .semibold))
-                    .foregroundStyle(palette.inkMuted)
+        VStack(spacing: 12) {
+            VStack(spacing: 6) {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Text("\(count)")
+                        .font(.system(size: 44, weight: .black, design: .rounded))
+                        .foregroundStyle(palette.ink)
+                        .contentTransition(.numericText())
+                        .scaleEffect(bump)
+                    Text(count == 1 ? "drink" : "drinks")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(palette.inkSecondary)
+                    Spacer()
+                    Text("hold to undo")
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundStyle(palette.inkMuted)
+                }
+                Text(promptsDrink
+                     ? "Double-tap the cube when you drink."
+                     : "The cube's counting for the whole table.")
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(promptsDrink ? Theme.party : palette.inkMuted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            Text(promptsDrink
-                 ? "Double-tap the cube when you drink."
-                 : "The cube's counting for the whole table.")
-                .font(.system(size: 12.5))
-                .foregroundStyle(promptsDrink ? Theme.party : palette.inkMuted)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            // The whole counter block takes the undo, so a fat finger at a
+            // party has a big target.
+            .contentShape(Rectangle())
+            .onLongPressGesture(minimumDuration: 0.45) { onUndo() }
+
+            Button(action: onLog) {
+                HStack(spacing: 10) {
+                    Image(systemName: "wineglass.fill")
+                        .font(.system(size: 17, weight: .bold))
+                    Text("Log a drink")
+                        .font(.system(size: 17, weight: .heavy))
+                }
+                .foregroundStyle(palette.onAccent)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 15)
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(Theme.party)
+                )
+            }
+            .buttonStyle(.plain)
+
+            Text("or double-tap the cube")
+                .font(.system(size: 11.5))
+                .foregroundStyle(palette.inkMuted)
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 14)
