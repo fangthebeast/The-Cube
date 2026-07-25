@@ -315,7 +315,7 @@
 
   .feed li {
     display: grid;
-    grid-template-columns: 66px 1fr auto;
+    grid-template-columns: 62px 1fr auto;
     gap: 10px;
     align-items: baseline;
     padding: 8px 2px;
@@ -347,11 +347,17 @@
   .feed .kind[data-k="tap"] { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 45%, transparent); }
   .feed .kind[data-k="roll"] { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
 
-  .empty {
+  /* The empty state is prose, not a row — it must escape the feed's grid.
+     The [hidden] rule has to win over that display, or it never goes away. */
+  .feed li.empty {
+    display: block;
+    border-bottom: 0;
     color: var(--ink-faint);
     font-size: 14px;
     padding: 8px 2px;
   }
+
+  .feed li.empty[hidden] { display: none; }
 
   /* ---------------- manual controls ---------------- */
 
@@ -507,10 +513,12 @@
   }
 
   function clockNow() {
+    // 24-hour, so the column never wraps onto a second line.
     return new Date().toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit",
       second: "2-digit",
+      hourCycle: "h23",
     });
   }
 
